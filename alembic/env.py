@@ -15,7 +15,15 @@ from app.core.config import settings
 config = context.config
 
 # 设置数据库URL
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("+asyncpg", ""))
+# MySQL: 移除 +asyncpg 或 +aiomysql 后缀
+# PostgreSQL: 移除 +asyncpg 后缀  
+database_url = settings.DATABASE_URL
+if "+aiomysql" in database_url:
+    database_url = database_url.replace("+aiomysql", "")
+elif "+asyncpg" in database_url:
+    database_url = database_url.replace("+asyncpg", "")
+
+config.set_main_option("sqlalchemy.url", database_url)
 
 # 配置日志
 if config.config_file_name is not None:

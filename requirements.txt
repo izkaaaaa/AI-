@@ -6,8 +6,12 @@ python-multipart==0.0.6
 # Database
 sqlalchemy==2.0.23
 alembic==1.12.1
-psycopg2-binary==2.9.9
-asyncpg==0.29.0
+# PostgreSQL drivers (云上线时使用)
+# psycopg2-binary==2.9.9
+# asyncpg==0.29.0
+# MySQL drivers (本地开发使用)
+aiomysql==0.2.0
+pymysql==1.1.0
 
 # Redis & Celery
 redis==5.0.1

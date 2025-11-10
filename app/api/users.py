@@ -64,13 +64,13 @@ async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.phone == login_data.phone))
     user = result.scalar_one_or_none()
     
-    if not user or not verify_password(login_data.password, user.password_hash):
+    if not user or not verify_password(login_data.password, user.password_hash):  # type: ignore[arg-type]
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="手机号或密码错误"
         )
     
-    if not user.is_active:
+    if not user.is_active:  # type: ignore[truthy-bool]
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="账号已被禁用"

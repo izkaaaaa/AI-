@@ -1,7 +1,7 @@
 """
 AI检测日志模型
 """
-from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, Text, String
 from sqlalchemy.sql import func
 from app.db.database import Base
 
@@ -19,6 +19,6 @@ class AIDetectionLog(Base):
     detected_keywords = Column(Text, nullable=True, comment="检测到的关键词(JSON)")
     model_version = Column(String(50), nullable=True, comment="使用的模型版本")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="检测时间")
-    
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="更新时间")
     def __repr__(self):
         return f"<AIDetectionLog(log_id={self.log_id}, call_id={self.call_id}, score={self.overall_score})>"

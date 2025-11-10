@@ -15,16 +15,16 @@ from app.api import users_router
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时执行
-    print("🚀 启动应用...")
+    print("启动应用...")
     await init_db()
-    print("✅ 数据库初始化完成")
+    print("数据库初始化完成")
     
     yield
     
     # 关闭时执行
-    print("🛑 关闭应用...")
+    print("关闭应用...")
     await close_redis()
-    print("✅ Redis连接已关闭")
+    print("Redis连接已关闭")
 
 
 # 创建FastAPI应用实例
@@ -67,8 +67,8 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG
+        "main:app",          # 指定运行的应用：main.py文件中的app实例
+        host="0.0.0.0",          # 监听所有网络
+        port=8000,               # 服务端口（客户端通过8000端口访问）
+        reload=settings.DEBUG    # 开发模式下热重载
     )

@@ -12,23 +12,23 @@ class Settings(BaseSettings):
     APP_NAME: str = "AI Anti-Fraud Detection System"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
-    SECRET_KEY: str
+    SECRET_KEY: str = "dev-secret-key-change-in-production"  # 生产环境通过.env覆盖
     
     # 数据库配置
-    DATABASE_URL: str
+    DATABASE_URL: str = "mysql+aiomysql://root:password@localhost:3306/fraud_detection"  # 开发环境默认MySQL
     
     # Redis配置
-    REDIS_URL: str
+    REDIS_URL: str = "redis://localhost:6379/0"  # 开发环境默认本地Redis
     
     # MinIO配置
-    MINIO_ENDPOINT: str
-    MINIO_ACCESS_KEY: str
-    MINIO_SECRET_KEY: str
+    MINIO_ENDPOINT: str = "localhost:9000"  # 开发环境默认本地MinIO
+    MINIO_ACCESS_KEY: str = "dev-minio-access-key"  # 生产环境通过.env覆盖
+    MINIO_SECRET_KEY: str = "dev-minio-secret-key"  # 生产环境通过.env覆盖
     MINIO_SECURE: bool = False
     MINIO_BUCKET_NAME: str = "fraud-detection"
     
     # JWT配置
-    JWT_SECRET_KEY: str
+    JWT_SECRET_KEY: str = "dev-jwt-secret-key-change-in-production"  # 生产环境通过.env覆盖
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     SMS_SECRET_KEY: Optional[str] = None
     
     # Celery配置
-    CELERY_BROKER_URL: str
-    CELERY_RESULT_BACKEND: str
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"  # 开发环境默认本地Redis DB1
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"  # 开发环境默认本地Redis DB2
     
     # AI模型路径
     VOICE_MODEL_PATH: str = "./models/voice_detection.onnx"
