@@ -15,11 +15,11 @@ from app.core.config import settings
 config = context.config
 
 # 设置数据库URL
-# MySQL: 移除 +asyncpg 或 +aiomysql 后缀
+# MySQL: 移除 +asyncpg 或 +aiomysql 后缀，替换为 +pymysql
 # PostgreSQL: 移除 +asyncpg 后缀  
 database_url = settings.DATABASE_URL
 if "+aiomysql" in database_url:
-    database_url = database_url.replace("+aiomysql", "")
+    database_url = database_url.replace("+aiomysql", "+pymysql")
 elif "+asyncpg" in database_url:
     database_url = database_url.replace("+asyncpg", "")
 

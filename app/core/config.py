@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-secret-key-change-in-production"  # 生产环境通过.env覆盖
     
     # 数据库配置
-    DATABASE_URL: str = "mysql+aiomysql://root:password@localhost:3306/fraud_detection"  # 开发环境默认MySQL
+    DATABASE_URL: str = "mysql+aiomysql://root:123456@localhost:3307/ai_fraud_detection"  # 开发环境默认MySQL
     
     # Redis配置
     REDIS_URL: str = "redis://localhost:6379/0"  # 开发环境默认本地Redis
