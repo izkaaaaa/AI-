@@ -5,64 +5,80 @@
 
 ## 技术栈
 - **Web框架**: FastAPI
-- **数据库**: PostgreSQL
+- **数据库**: MySQL 8.0 (开发环境)
 - **缓存**: Redis
 - **对象存储**: MinIO
 - **异步任务**: Celery
-- **AI框架**: PyTorch / TensorFlow
+- **AI框架**: PyTorch / TensorFlow (ONNX Runtime)
 - **容器化**: Docker
 
 ## 快速开始
 
-### 1. 环境准备
+### 方式一: 使用自动化脚本 (推荐)
+```bash
+# Windows环境一键初始化
+setup.bat
+```
+脚本会自动:
+- 创建Python虚拟环境
+- 安装所有依赖
+- 复制环境变量配置文件
+
+### 方式二: 手动配置
+
+#### 1. 环境准备
 ```bash
 # 创建Python虚拟环境
 python -m venv venv
 
-# 激活虚拟环境 (Windows)
-.\venv\Scripts\activate
+# 激活虚拟环境 (Windows PowerShell)
+.\venv\Scripts\Activate.ps1
 
 # 安装依赖
 pip install -r requirements.txt
 ```
 
-### 2. 配置环境变量
+#### 2. 配置环境变量
 ```bash
 # 复制环境变量模板
 copy .env.example .env
 
-# 编辑.env文件，填入实际配置
+# 编辑.env文件，修改数据库配置:
+# DATABASE_URL=mysql+aiomysql://root:123456@localhost:3307/ai_fraud_detection
 ```
 
-### 3. 启动数据库和Redis (使用Docker)
+#### 3. 启动Docker服务 (MySQL + Redis + MinIO)
 ```bash
-docker-compose up -d postgres redis minio
+# 启动MySQL容器 (映射到本地3307端口,避免与本地MySQL冲突)
+docker-compose up -d mysql
+
+# 或启动所有依赖服务
+docker-compose up -d mysql redis minio
 ```
 
-### 4. 初始化数据库
+#### 4. 初始化数据库
 ```bash
-# 创建数据库迁移
-alembic revision --autogenerate -m "Initial migration"
-
-# 执行迁移
-alembic upgrade head
+# 执行数据库迁移 (会自动创建所有表)
+python -m alembic upgrade head
 ```
 
-### 5. 启动应用
+#### 5. 启动应用
 ```bash
-# 开发模式
+# 开发模式 (带热重载)
 python main.py
 
-# 或使用uvicorn
+# 或直接使用uvicorn
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 6. 访问API文档
-打开浏览器访问: http://localhost:8000/docs
+#### 6. 访问API文档
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+- **健康检查**: http://localhost:8000/health
 
 ## 项目结构
 ```
-d:/00_firstFile/
+d:/00_frameFile/
 ├── app/
 │   ├── __init__.py
 │   ├── api/              # API路由
@@ -165,6 +181,22 @@ d:/00_firstFile/
 3. 创建对应的 Pydantic Schema
 4. 运行 `alembic revision --autogenerate` 生成迁移
 
+## 停止服务
+
+### 停止FastAPI应用
+```bash
+# 在运行应用的终端按 Ctrl+C
+```
+
+### 停止Docker容器
+```bash
+# 停止所有容器
+docker-compose down
+
+# 仅停止MySQL
+docker-compose down mysql
+```
+
 ## 部署
 
 ### Docker部署
@@ -172,9 +204,34 @@ d:/00_firstFile/
 # 构建镜像
 docker build -t ai-fraud-detection-api .
 
-# 运行容器
+# 启动所有服务
 docker-compose up -d
 ```
+
+## 常见问题
+
+### 1. Docker镜像拉取失败
+配置Docker国内镜像源 (Docker Desktop → Settings → Docker Engine):
+```json
+{
+  "registry-mirrors": [
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://hub-mirror.c.163.com"
+  ]
+}
+```
+
+### 2. 数据库连接失败
+检查:
+- Docker MySQL容器是否已启动: `docker ps`
+- `.env` 文件中数据库配置是否正确 (端口3307)
+- MySQL密码是否为 `123456`
+
+### 3. 端口被占用
+- FastAPI默认端口: 8000
+- MySQL端口: 3307 (容器内3306)
+- Redis端口: 6379
+- MinIO端口: 9000, 9001
 
 ## 下一步开发计划
 - [ ] 实现JWT认证中间件

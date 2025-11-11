@@ -10,6 +10,7 @@ services:
       MYSQL_PASSWORD: 123456
     ports:
       - "3307:3306"
+      # 云上线仍然需要3306：3306
     volumes:
       - mysql_data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
