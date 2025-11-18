@@ -10,7 +10,8 @@ from datetime import datetime
 class UserBase(BaseModel):
     """用户基础模型"""
     phone: str = Field(..., min_length=11, max_length=11, description="手机号")
-    name: str = Field(..., min_length=2, max_length=50, description="用户姓名")
+    username: str = Field(..., min_length=3, max_length=50, description="用户名")
+    name: Optional[str] = Field(None, min_length=2, max_length=50, description="用户姓名")
 
 
 class UserCreate(UserBase):

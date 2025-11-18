@@ -90,6 +90,7 @@ async def test_register_success(client, setup_database):
             "/api/users/register",
             json={
                 "phone": "13800138000",
+                "username": "testuser",
                 "name": "测试用户",
                 "password": "123456",
                 "sms_code": "123456"
@@ -112,6 +113,7 @@ async def test_register_duplicate_phone(client, setup_database):
             "/api/users/register",
             json={
                 "phone": "13800138001",
+                "username": "user1",
                 "name": "用户1",
                 "password": "123456",
                 "sms_code": "123456"
@@ -122,6 +124,7 @@ async def test_register_duplicate_phone(client, setup_database):
             "/api/users/register",
             json={
                 "phone": "13800138001",
+                "username": "user2",
                 "name": "用户2",
                 "password": "654321",
                 "sms_code": "123456"
@@ -141,6 +144,7 @@ async def test_login_success(client, setup_database):
             "/api/users/register",
             json={
                 "phone": "13800138002",
+                "username": "logintest",
                 "name": "登录测试",
                 "password": "123456",
                 "sms_code": "123456"
@@ -171,6 +175,7 @@ async def test_login_wrong_password(client, setup_database):
             "/api/users/register",
             json={
                 "phone": "13800138003",
+                "username": "testuser3",
                 "name": "测试",
                 "password": "123456",
                 "sms_code": "123456"
@@ -197,6 +202,7 @@ async def test_get_current_user(client, setup_database):
             "/api/users/register",
             json={
                 "phone": "13800138004",
+                "username": "testuser4",
                 "name": "测试用户",
                 "password": "123456",
                 "sms_code": "123456"
@@ -219,6 +225,7 @@ async def test_get_current_user(client, setup_database):
     assert response.status_code == 200
     data = response.json()
     assert data["phone"] == "13800138004"
+    assert data["username"] == "testuser4"
     assert data["name"] == "测试用户"
 
 
@@ -232,6 +239,7 @@ async def test_bind_family(client, setup_database):
             "/api/users/register",
             json={
                 "phone": "13800138005",
+                "username": "testuser5",
                 "name": "测试",
                 "password": "123456",
                 "sms_code": "123456"
@@ -263,6 +271,7 @@ async def test_unbind_family(client, setup_database):
             "/api/users/register",
             json={
                 "phone": "13800138006",
+                "username": "testuser6",
                 "name": "测试",
                 "password": "123456",
                 "sms_code": "123456"

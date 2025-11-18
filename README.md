@@ -78,10 +78,25 @@ python main.py
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+#### 6. 启动Celery Worker (可选,用于异步任务)
+```bash
+# Windows
+start_celery.bat
+
+# 或手动启动
+python -m celery -A app.tasks.celery_app worker --loglevel=info --pool=solo
+```
+
 #### 6. 访问API文档
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 - **健康检查**: http://localhost:8000/health
+
+#### 7. 测试实时检测功能
+```bash
+# 运行测试脚本
+python test_realtime_detection.py
+```
 
 ## 项目结构
 ```
@@ -90,7 +105,9 @@ d:/00_frameFile/
 │   ├── __init__.py
 │   ├── api/              # API路由
 │   │   ├── __init__.py
-│   │   └── users.py      # 用户管理接口 (异步)
+│   │   ├── users.py      # 用户管理接口 (异步)
+│   │   ├── detection.py  # 实时检测接口 (WebSocket + 文件上传)
+│   │   └── tasks.py      # 异步任务管理接口
 │   ├── core/             # 核心配置
 │   │   ├── __init__.py
 │   │   ├── config.py     # 配置管理
@@ -108,8 +125,18 @@ d:/00_frameFile/
 │   │   ├── ai_detection_log.py
 │   │   ├── risk_rule.py
 │   │   └── blacklist.py
-│   └── schemas/          # Pydantic模型
-│       └── __init__.py
+│   ├── schemas/          # Pydantic模型
+│   │   └── __init__.py
+│   ├── services/         # 服务层
+│   │   ├── __init__.py
+│   │   ├── websocket_manager.py  # WebSocket连接管理
+│   │   ├── audio_processor.py    # 音频处理
+│   │   ├── video_processor.py    # 视频处理
+│   │   └── model_service.py      # AI模型服务
+│   └── tasks/            # Celery异步任务
+│       ├── __init__.py
+│       ├── celery_app.py         # Celery配置
+│       └── detection_tasks.py    # 检测任务
 ├── tests/                # 单元测试
 │   ├── __init__.py
 │   └── test_users.py     # 用户模块测试
@@ -123,6 +150,7 @@ d:/00_frameFile/
 ├── .gitignore
 ├── alembic.ini           # Alembic配置
 ├── docker-compose.yml    # Docker编排
+├── start_celery.bat      # Celery启动脚本
 └── Dockerfile            # Docker镜像
 ```
 
@@ -136,9 +164,38 @@ d:/00_frameFile/
 - `PUT /api/users/family/{family_id}` - 绑定家庭组 (需要JWT)
 - `DELETE /api/users/family` - 解绑家庭组 (需要JWT)
 
+### 实时检测
+- `WS /api/detection/ws/{user_id}` - WebSocket实时音视频检测连接
+- `POST /api/detection/upload/audio` - 上传音频文件 (需要JWT)
+- `POST /api/detection/upload/video` - 上传视频文件 (需要JWT)
+- `POST /api/detection/extract-frames` - 提取视频关键帧 (需要JWT)
+
+### 异步任务
+- `POST /api/tasks/audio/detect` - 提交音频检测任务 (需要JWT)
+- `POST /api/tasks/video/detect` - 提交视频检测任务 (需要JWT)
+- `POST /api/tasks/text/detect` - 提交文本检测任务 (需要JWT)
+- `GET /api/tasks/status/{task_id}` - 查询任务状态
+
 ### 系统接口
 - `GET /` - 系统信息
 - `GET /health` - 健康检查
+
+## 已实现功能
+
+- ✅ 异步数据库连接和操作
+- ✅ JWT用户认证
+- ✅ 短信验证码服务(Redis存储)
+- ✅ 用户注册、登录
+- ✅ 家庭组绑定/解绑
+- ✅ 完整的单元测试
+- ✅ Docker容器化部署
+- ✅ 数据库迁移支持
+- ✅ WebSocket实时通信
+- ✅ 音视频流处理
+- ✅ MinIO文件存储
+- ✅ AI模型服务层
+- ✅ Celery异步任务队列
+- ✅ 任务状态监控
 
 ## 数据库表结构
 
@@ -243,6 +300,10 @@ python -m pytest tests/ -v -s
 - ✅ 用户登录(成功+密码错误)
 - ✅ JWT认证和用户信息获取
 - ✅ 家庭组绑定和解绑
+- ✅ WebSocket实时连接和心跳
+- ✅ 音频/视频流处理
+- ✅ 文件上传到MinIO
+- ✅ Celery异步任务执行
 
 ### 添加新的API路由
 1. 在 `app/api/` 目录下创建新的路由文件
@@ -320,16 +381,39 @@ pip install bcrypt==4.1.3
 - ✅ 所有数据库操作都要使用 `await`
 - ✅ 所有路由函数都要用 `async def`
 
+### 6. Celery启动问题
+如果遇到 "Unable to create process" 错误:
+```bash
+# 使用 python -m celery 而不是直接调用 celery
+python -m celery -A app.tasks.celery_app worker --loglevel=info --pool=solo
+```
+
+### 7. MinIO连接问题
+检查MinIO是否启动:
+```bash
+docker ps | findstr minio
+# 如未启动
+docker-compose up -d minio
+```
+
 ## 下一步开发计划
 - [x] 实现JWT认证中间件
 - [x] 集成短信验证码服务
 - [x] 添加单元测试 (9个测试用例全部通过)
 - [x] 实现异步数据库架构
 - [x] 完善家庭组功能 (绑定/解绑)
-- [ ] 开发通话检测API
-- [ ] 集成AI模型服务
-- [ ] 实现WebSocket实时推送
-- [ ] 添加Celery异步任务
+- [x] WebSocket实时通信
+- [x] 音视频流处理
+- [x] MinIO文件存储集成
+- [x] AI模型服务层架构
+- [x] Celery异步任务队列
+- [ ] 加载实际AI模型文件
+- [ ] 实现真实的音频特征提取(MFCC)
+- [ ] 集成人脸检测模型
+- [ ] 开发通话记录管理API
+- [ ] 实现WebSocket断线重连
+- [ ] 添加任务优先级机制
+- [ ] 集成Prometheus监控
 
 ## 许可证
 MIT License

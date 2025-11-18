@@ -65,3 +65,22 @@ class MinIOClient:
 
 # 全局MinIO客户端实例
 minio_client = MinIOClient()
+
+
+# 便捷函数
+async def upload_to_minio(file_data: bytes, object_name: str, content_type: str = "application/octet-stream") -> str:
+    """
+    上传文件到MinIO的便捷函数
+    
+    Args:
+        file_data: 文件字节数据
+        object_name: 对象名称(路径)
+        content_type: 文件MIME类型
+        
+    Returns:
+        文件URL
+    """
+    result = minio_client.upload_file(file_data, object_name, content_type)
+    if result:
+        return minio_client.get_file_url(object_name) or result
+    raise Exception("Failed to upload file to MinIO")

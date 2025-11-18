@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.db.database import init_db
-from app.api import users_router
+from app.api import users_router, detection_router, tasks_router, call_records_router
 
 
 @asynccontextmanager
@@ -47,6 +47,9 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(users_router)
+app.include_router(detection_router)
+app.include_router(tasks_router)
+app.include_router(call_records_router)
 
 
 @app.get("/")
@@ -69,7 +72,7 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "main:app",          # 指定运行的应用：main.py文件中的app实例
-        host="127.0.0.1",          # 监听所有网络
+        host="0.0.0.0",          # 监听所有网络
         port=8000,               # 服务端口（客户端通过8000端口访问）
         reload=settings.DEBUG    # 开发模式下热重载
     )

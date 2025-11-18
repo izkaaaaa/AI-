@@ -66,9 +66,20 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
             detail="该手机号已注册"
         )
     
+    # 检查用户名是否已存在
+    result = await db.execute(select(User).where(User.username == user_data.username))
+    existing_username = result.scalar_one_or_none()
+    
+    if existing_username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该用户名已被使用"
+        )
+    
     # 创建新用户
     new_user = User(
         phone=user_data.phone,
+        username=user_data.username,
         name=user_data.name,
         password_hash=get_password_hash(user_data.password)
     )
