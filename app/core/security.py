@@ -5,6 +5,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 from app.core.config import settings
 
 # 密码加密上下文
@@ -41,3 +44,45 @@ def decode_access_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+# HTTP Bearer 认证方案
+security = HTTPBearer()
+
+
+async def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> int:
+    """
+    从JWT令牌中获取当前用户ID
+    用于需要认证的路由
+    """
+    token = credentials.credentials
+    
+    # 解析令牌
+    payload = decode_access_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的认证令牌",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # 获取用户ID
+    user_id: Optional[str] = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="令牌格式错误",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    try:
+        return int(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="令牌中的用户ID无效",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+

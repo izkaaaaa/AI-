@@ -4,13 +4,14 @@
 基于FastAPI的AI伪造检测与诈骗预警系统后端服务，提供实时通话检测、Deepfake识别、诈骗话术分析等功能。
 
 ## 技术栈
-- **Web框架**: FastAPI
-- **数据库**: MySQL 8.0 (开发环境)
+- **Web框架**: FastAPI (异步)
+- **数据库**: MySQL 8.0 + SQLAlchemy (异步)
 - **缓存**: Redis
 - **对象存储**: MinIO
 - **异步任务**: Celery
 - **AI框架**: PyTorch / TensorFlow (ONNX Runtime)
 - **容器化**: Docker
+- **测试框架**: Pytest + pytest-asyncio
 
 ## 快速开始
 
@@ -36,6 +37,9 @@ python -m venv venv
 
 # 安装依赖
 pip install -r requirements.txt
+
+# 注意: 如果遇到bcrypt版本兼容问题,请安装特定版本:
+pip install bcrypt==4.1.3
 ```
 
 #### 2. 配置环境变量
@@ -58,6 +62,13 @@ docker-compose up -d mysql redis minio
 python -m alembic upgrade head
 ```
 
+> **注意**: 
+> - 数据库会通过Docker自动创建,无需手动创建
+> - 表结构会在应用启动时通过异步init_db自动创建
+> - 正常开发中只需要对数据库进行增删改查操作
+> - alembic配置已修改为使用pymysql驱动
+> - 数据库URL使用 `mysql+aiomysql://` 前缀支持异步
+
 #### 5. 启动应用
 ```bash
 # 开发模式 (带热重载)
@@ -79,16 +90,17 @@ d:/00_frameFile/
 │   ├── __init__.py
 │   ├── api/              # API路由
 │   │   ├── __init__.py
-│   │   └── users.py      # 用户管理接口
+│   │   └── users.py      # 用户管理接口 (异步)
 │   ├── core/             # 核心配置
 │   │   ├── __init__.py
 │   │   ├── config.py     # 配置管理
-│   │   ├── security.py   # JWT认证
+│   │   ├── security.py   # JWT认证 (异步)
 │   │   ├── redis.py      # Redis工具
+│   │   ├── sms.py        # 短信验证码服务
 │   │   └── storage.py    # MinIO存储
 │   ├── db/               # 数据库
 │   │   ├── __init__.py
-│   │   └── database.py   # 数据库连接
+│   │   └── database.py   # 异步数据库连接
 │   ├── models/           # 数据模型
 │   │   ├── __init__.py
 │   │   ├── user.py
@@ -98,6 +110,9 @@ d:/00_frameFile/
 │   │   └── blacklist.py
 │   └── schemas/          # Pydantic模型
 │       └── __init__.py
+├── tests/                # 单元测试
+│   ├── __init__.py
+│   └── test_users.py     # 用户模块测试
 ├── alembic/              # 数据库迁移
 │   ├── env.py
 │   └── script.py.mako
@@ -114,10 +129,12 @@ d:/00_frameFile/
 ## API接口
 
 ### 用户管理
-- `POST /api/users/register` - 用户注册
+- `POST /api/users/send-code?phone={phone}` - 发送短信验证码
+- `POST /api/users/register` - 用户注册 (需要短信验证码)
 - `POST /api/users/login` - 用户登录
-- `GET /api/users/me` - 获取当前用户信息
-- `PUT /api/users/family/{family_id}` - 绑定家庭组
+- `GET /api/users/me` - 获取当前用户信息 (需要JWT)
+- `PUT /api/users/family/{family_id}` - 绑定家庭组 (需要JWT)
+- `DELETE /api/users/family` - 解绑家庭组 (需要JWT)
 
 ### 系统接口
 - `GET /` - 系统信息
@@ -165,6 +182,67 @@ d:/00_frameFile/
 - report_count: 举报次数
 
 ## 开发指南
+
+### 异步编程规范
+
+**本项目使用异步架构**,请遵循以下规范:
+
+1. **路由函数必须使用 `async def`**
+2. **数据库操作必须使用 `await`**
+3. **使用 `AsyncSession` 而非 `Session`**
+4. **使用 `select()` 而非 `.query()`**
+
+#### 异步数据库操作示例
+
+```python
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.db.database import get_db
+from fastapi import Depends
+
+@router.get("/example")
+async def some_function(db: AsyncSession = Depends(get_db)):
+    # 查询
+    result = await db.execute(select(User).where(User.id == 1))
+    user = result.scalar_one_or_none()
+    
+    # 添加
+    new_user = User(name="test")
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    
+    # 更新
+    user.name = "new_name"
+    await db.commit()
+    
+    # 删除
+    await db.delete(user)
+    await db.commit()
+```
+
+### 运行单元测试
+
+```bash
+# 运行所有测试
+python -m pytest tests/ -v
+
+# 运行特定测试文件
+python -m pytest tests/test_users.py -v
+
+# 运行特定测试函数
+python -m pytest tests/test_users.py::test_register_success -v
+
+# 显示详细输出
+python -m pytest tests/ -v -s
+```
+
+#### 测试覆盖
+- ✅ 健康检查和根路径
+- ✅ 用户注册(成功+重复手机号)
+- ✅ 用户登录(成功+密码错误)
+- ✅ JWT认证和用户信息获取
+- ✅ 家庭组绑定和解绑
 
 ### 添加新的API路由
 1. 在 `app/api/` 目录下创建新的路由文件
@@ -229,15 +307,29 @@ docker-compose up -d
 - Redis端口: 6379
 - MinIO端口: 9000, 9001
 
+### 4. bcrypt版本兼容问题
+如果遇到 "password cannot be longer than 72 bytes" 错误:
+```bash
+pip install bcrypt==4.1.3
+```
+
+### 5. 异步编程常见错误
+- ❌ 忘记使用 `await` 导致获取协程对象而非结果
+- ❌ 在同步函数中直接调用 `await`
+- ❌ 混用 `AsyncSession` 与同步 `query()` 方法
+- ✅ 所有数据库操作都要使用 `await`
+- ✅ 所有路由函数都要用 `async def`
+
 ## 下一步开发计划
-- [ ] 实现JWT认证中间件
-- [ ] 集成短信验证码服务
+- [x] 实现JWT认证中间件
+- [x] 集成短信验证码服务
+- [x] 添加单元测试 (9个测试用例全部通过)
+- [x] 实现异步数据库架构
+- [x] 完善家庭组功能 (绑定/解绑)
 - [ ] 开发通话检测API
 - [ ] 集成AI模型服务
 - [ ] 实现WebSocket实时推送
 - [ ] 添加Celery异步任务
-- [ ] 完善家庭组功能
-- [ ] 添加单元测试
 
 ## 许可证
 MIT License

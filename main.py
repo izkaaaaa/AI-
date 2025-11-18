@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.db.database import init_db
-from app.core.redis import close_redis
 from app.api import users_router
 
 
@@ -16,15 +15,17 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时执行
     print("启动应用...")
-    await init_db()
-    print("数据库初始化完成")
+    try:
+        await init_db()
+        print("数据库初始化完成")
+    except Exception as e:
+        print(f"警告: 数据库连接失败 - {e}")
+        print("请确保 MySQL 服务正在运行: docker-compose up -d mysql")
     
     yield
     
     # 关闭时执行
     print("关闭应用...")
-    await close_redis()
-    print("Redis连接已关闭")
 
 
 # 创建FastAPI应用实例
@@ -45,7 +46,6 @@ app.add_middleware(
 )
 
 # 注册路由
-# 用户路由
 app.include_router(users_router)
 
 
