@@ -154,48 +154,392 @@ d:/00_frameFile/
 └── Dockerfile            # Docker镜像
 ```
 
-## API接口
+## API接口文档 (前端开发必读)
 
-### 用户管理
-- `POST /api/users/send-code?phone={phone}` - 发送短信验证码
-- `POST /api/users/register` - 用户注册 (需要短信验证码)
-- `POST /api/users/login` - 用户登录
-- `GET /api/users/me` - 获取当前用户信息 (需要JWT)
-- `PUT /api/users/family/{family_id}` - 绑定家庭组 (需要JWT)
-- `DELETE /api/users/family` - 解绑家庭组 (需要JWT)
+> **认证说明**: 标记了 🔒 的接口需要在Header中携带JWT Token:  
+> `Authorization: Bearer {access_token}`
 
-### 实时检测
-- `WS /api/detection/ws/{user_id}` - WebSocket实时音视频检测连接
-- `POST /api/detection/upload/audio` - 上传音频文件 (需要JWT)
-- `POST /api/detection/upload/video` - 上传视频文件 (需要JWT)
-- `POST /api/detection/extract-frames` - 提取视频关键帧 (需要JWT)
+### 1. 用户管理
 
-### 异步任务
-- `POST /api/tasks/audio/detect` - 提交音频检测任务 (需要JWT)
-- `POST /api/tasks/video/detect` - 提交视频检测任务 (需要JWT)
-- `POST /api/tasks/text/detect` - 提交文本检测任务 (需要JWT)
-- `GET /api/tasks/status/{task_id}` - 查询任务状态
+#### 1.1 发送验证码
+**接口**: `POST /api/users/send-code?phone={phone}`  
+**参数**: URL参数 `phone` (11位手机号)  
+**请求体**: 无  
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "验证码已发送",
+  "data": {
+    "phone": "13900139000"
+  }
+}
+```
 
-### 系统接口
-- `GET /` - 系统信息
-- `GET /health` - 健康检查
+#### 1.2 用户注册
+**接口**: `POST /api/users/register`  
+**Content-Type**: `application/json`  
+**请求体**:
+```json
+{
+  "phone": "13900139000",        // 必填: 11位手机号
+  "username": "zhangsan",        // 必填: 用户名(3-50字符,唯一)
+  "name": "张三",                // 可选: 真实姓名(2-50字符)
+  "password": "123456",          // 必填: 密码(6-20字符)
+  "sms_code": "123456"           // 必填: 短信验证码(4-6位)
+}
+```
+**响应示例**:
+```json
+{
+  "code": 201,
+  "message": "注册成功",
+  "data": {
+    "user_id": 1
+  }
+}
+```
+
+#### 1.3 用户登录
+**接口**: `POST /api/users/login`  
+**Content-Type**: `application/json`  
+**请求体**:
+```json
+{
+  "phone": "13900139000",        // 必填: 手机号
+  "password": "123456"           // 必填: 密码
+}
+```
+**响应示例**:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user": {
+    "phone": "13900139000",
+    "username": "zhangsan",
+    "name": "张三",
+    "user_id": 1,
+    "family_id": null,
+    "is_active": true,
+    "created_at": "2025-11-18T12:58:07"
+  }
+}
+```
+
+#### 1.4 获取当前用户信息 🔒
+**接口**: `GET /api/users/me`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**请求体**: 无  
+**响应示例**:
+```json
+{
+  "phone": "13900139000",
+  "username": "zhangsan",
+  "name": "张三",
+  "user_id": 1,
+  "family_id": null,
+  "is_active": true,
+  "created_at": "2025-11-18T12:58:07"
+}
+```
+
+#### 1.5 绑定家庭组 🔒
+**接口**: `PUT /api/users/family/{family_id}`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**URL参数**: `family_id` (整数)  
+**请求体**: 无  
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "绑定成功",
+  "data": {
+    "user_id": 1,
+    "family_id": 1
+  }
+}
+```
+
+#### 1.6 解绑家庭组 🔒
+**接口**: `DELETE /api/users/family`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**请求体**: 无  
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "解绑成功",
+  "data": {
+    "user_id": 1
+  }
+}
+```
+
+---
+
+### 2. 实时检测
+
+#### 2.1 WebSocket连接
+**接口**: `WS /api/detection/ws/{user_id}`  
+**协议**: WebSocket  
+**发送消息格式**:
+```json
+// 心跳
+{"type": "heartbeat"}
+
+// 音频数据
+{
+  "type": "audio",
+  "data": "base64编码的音频数据"
+}
+
+// 视频帧
+{
+  "type": "video",
+  "data": "base64编码的视频帧数据"
+}
+```
+**接收消息格式**:
+```json
+// 心跳响应
+{
+  "type": "heartbeat_ack",
+  "timestamp": "2025-11-18T20:41:26.037898"
+}
+
+// 音频检测结果
+{
+  "type": "audio_result",
+  "result": {
+    "status": "success",
+    "confidence": 0.95,
+    "is_fake": false
+  }
+}
+```
+
+#### 2.2 上传音频文件 🔒
+**接口**: `POST /api/detection/upload/audio`  
+**Content-Type**: `multipart/form-data`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**请求体**:
+```
+file: (音频文件) [支持格式: mp3, wav, m4a, ogg]
+call_id: (可选) 通话ID
+```
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "音频上传成功",
+  "data": {
+    "url": "http://localhost:9000/fraud-detection/audio/1/test.mp3?X-Amz-...",
+    "filename": "test.mp3",
+    "size": 1024
+  }
+}
+```
+
+#### 2.3 上传视频文件 🔒
+**接口**: `POST /api/detection/upload/video`  
+**Content-Type**: `multipart/form-data`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**请求体**:
+```
+file: (视频文件) [支持格式: mp4, avi, mov, mkv]
+call_id: (可选) 通话ID
+```
+**响应示例**: 同音频上传
+
+#### 2.4 提取视频关键帧 🔒
+**接口**: `POST /api/detection/extract-frames`  
+**Content-Type**: `multipart/form-data`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**请求体**:
+```
+file: (视频文件)
+frame_count: (可选) 提取帧数,默认10
+```
+
+---
+
+### 3. 异步任务
+
+#### 3.1 提交音频检测任务 🔒
+**接口**: `POST /api/tasks/audio/detect`  
+**Content-Type**: `application/json`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**请求体**:
+```json
+{
+  "audio_features": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],  // 必填: 音频特征数组
+  "call_id": 1                                           // 必填: 通话ID
+}
+```
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "任务提交成功",
+  "data": {
+    "task_id": "771a2a72-5b32-4dd6-aacb-813d82ad5d95"
+  }
+}
+```
+
+#### 3.2 提交视频检测任务 🔒
+**接口**: `POST /api/tasks/video/detect`  
+**Content-Type**: `application/json`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**请求体**:
+```json
+{
+  "frame_data": [[...], [...]],  // 必填: 视频帧数据数组
+  "call_id": 1                     // 必填: 通话ID
+}
+```
+
+#### 3.3 提交文本检测任务 🔒
+**接口**: `POST /api/tasks/text/detect`  
+**Content-Type**: `application/json`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**请求体**:
+```json
+{
+  "text": "这是要检测的文本内容",  // 必填: 文本内容
+  "call_id": 1                     // 必填: 通话ID
+}
+```
+
+#### 3.4 查询任务状态
+**接口**: `GET /api/tasks/status/{task_id}`  
+**URL参数**: `task_id` (任务ID)  
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "task_id": "771a2a72-5b32-4dd6-aacb-813d82ad5d95",
+    "status": "SUCCESS",
+    "result": {
+      "confidence": 0.95,
+      "is_fake": false
+    }
+  }
+}
+```
+
+---
+
+### 4. 通话记录管理
+
+#### 4.1 获取我的通话记录 🔒
+**接口**: `GET /api/call-records/my-records`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**URL参数**:
+- `page`: 页码 (默认1)
+- `page_size`: 每页数量 (默认20,最大100)
+- `result_filter`: 筛选结果 (可选: safe/suspicious/fake)
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "records": [
+      {
+        "call_id": 1,
+        "caller_number": "13800138000",
+        "start_time": "2025-11-18T10:00:00",
+        "duration": 120,
+        "detected_result": "safe"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "page_size": 20,
+      "total": 100,
+      "total_pages": 5
+    }
+  }
+}
+```
+
+#### 4.2 获取通话记录详情 🔒
+**接口**: `GET /api/call-records/record/{call_id}`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**URL参数**: `call_id` (通话ID)  
+
+#### 4.3 获取家庭组通话记录 🔒
+**接口**: `GET /api/call-records/family-records`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**URL参数**: 同4.1
+
+#### 4.4 删除通话记录 🔒
+**接口**: `DELETE /api/call-records/record/{call_id}`  
+**请求头**: `Authorization: Bearer {access_token}`  
+**URL参数**: `call_id` (通话ID)
+
+---
+
+### 5. 系统接口
+
+#### 5.1 系统信息
+**接口**: `GET /`  
+**响应示例**:
+```json
+{
+  "message": "AI Anti-Fraud Detection System API",
+  "version": "1.0.0",
+  "status": "running"
+}
+```
+
+#### 5.2 健康检查
+**接口**: `GET /health`  
+**响应示例**:
+```json
+{"status": "healthy"}
+```
 
 ## 已实现功能
 
-- ✅ 异步数据库连接和操作
+### 基础架构
+- ✅ 异步数据库连接和操作 (AsyncSession + aiomysql)
+- ✅ Docker容器化部署 (MySQL + Redis + MinIO)
+- ✅ 数据库迁移支持 (Alembic)
+- ✅ 完整的单元测试 (9个测试用例全部通过)
+- ✅ API文档自动生成 (Swagger + ReDoc)
+
+### 用户管理
 - ✅ JWT用户认证
-- ✅ 短信验证码服务(Redis存储)
-- ✅ 用户注册、登录
+- ✅ 短信验证码服务 (Redis存储)
+- ✅ 用户注册 (用户名+密码+验证码)
+- ✅ 用户登录
 - ✅ 家庭组绑定/解绑
-- ✅ 完整的单元测试
-- ✅ Docker容器化部署
-- ✅ 数据库迁移支持
+- ✅ 用户名唯一性验证
+
+### 实时检测
 - ✅ WebSocket实时通信
 - ✅ 音视频流处理
 - ✅ MinIO文件存储
-- ✅ AI模型服务层
+- ✅ AI模型服务层架构
+- ✅ 文件上传 (音频/视频)
+
+### 异步任务
 - ✅ Celery异步任务队列
+- ✅ Redis消息代理
 - ✅ 任务状态监控
+- ✅ 音频/视频/文本检测任务
+
+### 数据管理
+- ✅ 通话记录查询 (数据隔离)
+- ✅ AI检测日志查询
+- ✅ 家庭组数据共享
+- ✅ 记录删除功能
 
 ## 数据库表结构
 
@@ -397,6 +741,8 @@ docker-compose up -d minio
 ```
 
 ## 下一步开发计划
+
+### 已完成任务 ✅
 - [x] 实现JWT认证中间件
 - [x] 集成短信验证码服务
 - [x] 添加单元测试 (9个测试用例全部通过)
@@ -407,13 +753,20 @@ docker-compose up -d minio
 - [x] MinIO文件存储集成
 - [x] AI模型服务层架构
 - [x] Celery异步任务队列
-- [ ] 加载实际AI模型文件
-- [ ] 实现真实的音频特征提取(MFCC)
-- [ ] 集成人脸检测模型
-- [ ] 开发通话记录管理API
-- [ ] 实现WebSocket断线重连
+- [x] 开发通话记录管理API
+- [x] 数据隔离机制 (用户只能看自己的数据)
+- [x] 用户名字段支持 (区分username和name)
+
+### 待开发任务 ⏳
+- [ ] 加载实际AI模型文件 (voice_detection.onnx, video_detection.onnx)
+- [ ] 实现真实的音频特征提取 (MFCC + librosa)
+- [ ] 集成人脸检测模型 (OpenCV + dlib)
+- [ ] 实现WebSocket断线重连机制
 - [ ] 添加任务优先级机制
 - [ ] 集成Prometheus监控
+- [ ] 添加通话记录创建 API
+- [ ] 实现黑名单管理功能
+- [ ] 实现风险规则管理功能
 
 ## 许可证
 MIT License
