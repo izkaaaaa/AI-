@@ -154,7 +154,7 @@ d:/00_frameFile/
 └── Dockerfile            # Docker镜像
 ```
 
-## API接口文档 (前端开发必读)
+## API接口文档 
 
 > **认证说明**: 标记了 🔒 的接口需要在Header中携带JWT Token:  
 > `Authorization: Bearer {access_token}`
@@ -742,7 +742,7 @@ docker-compose up -d minio
 
 ## 下一步开发计划
 
-### 已完成任务 ✅
+### 已完成任务✅
 - [✅] 实现JWT认证中间件
 - [✅] 集成短信验证码服务
 - [✅] 添加单元测试 (9个测试用例全部通过)

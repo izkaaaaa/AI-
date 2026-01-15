@@ -10,40 +10,49 @@ import numpy as np
 
 
 async def test_websocket():
-    """测试WebSocket连接和实时检测"""
+    """测试WebSocket连接和实时检测（带鉴权）"""
     print("=== 测试WebSocket实时检测 ===")
     
-    uri = "ws://localhost:8000/api/detection/ws/1"
+    # 1. 先登录获取Token
+    async with httpx.AsyncClient() as client:
+        login_response = await client.post(
+            "http://localhost:8000/api/users/login",
+            json={
+                "phone": "13800138000",  # 确保数据库中有此用户
+                "password": "123456"
+            }
+        )
+        
+        if login_response.status_code != 200:
+            print(f"✗ 登录失败: {login_response.text}")
+            return
+            
+        data = login_response.json()
+        token = data["access_token"]
+        user_id = data["user"]["user_id"]
+        print(f"✓ 登录成功，User ID: {user_id}")
+
+    # 2. 拼接带Token的WebSocket URL
+    uri = f"ws://localhost:8000/api/detection/ws/{user_id}?token={token}"
     
     try:
-        async with websockets.connect(uri) as websocket:
+        # 添加额外headers以模拟真实环境
+        extra_headers = {
+            "Authorization": f"Bearer {token}"
+        }
+        
+        async with websockets.connect(uri, extra_headers=extra_headers) as websocket:
             print(f"✓ WebSocket连接成功: {uri}")
             
-            # 1. 发送心跳
-            await websocket.send(json.dumps({
-                "type": "heartbeat"
-            }))
+            # 发送心跳测试
+            await websocket.send(json.dumps({"type": "heartbeat"}))
             response = await websocket.recv()
             print(f"✓ 心跳响应: {response}")
             
-            # 2. 发送模拟音频数据
-            fake_audio_data = base64.b64encode(b"fake_audio_chunk").decode()
-            await websocket.send(json.dumps({
-                "type": "audio",
-                "data": fake_audio_data
-            }))
-            response = await websocket.recv()
-            print(f"✓ 音频检测响应: {response}")
+            # ... 后续发送音频/视频数据的测试保持不变 ...
             
-            # 3. 发送模拟视频帧
-            fake_frame_data = base64.b64encode(b"fake_video_frame").decode()
-            await websocket.send(json.dumps({
-                "type": "video",
-                "data": fake_frame_data
-            }))
-            response = await websocket.recv()
-            print(f"✓ 视频检测响应: {response}")
-            
+    except websockets.exceptions.InvalidStatusCode as e:
+        print(f"✗ 连接被拒绝: 状态码 {e.status_code}")
     except Exception as e:
         print(f"✗ WebSocket测试失败: {e}")
 

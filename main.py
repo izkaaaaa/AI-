@@ -70,9 +70,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",          # 指定运行的应用：main.py文件中的app实例
-        host="0.0.0.0",          # 监听所有网络
-        port=8000,               # 服务端口（客户端通过8000端口访问）
-        reload=settings.DEBUG    # 开发模式下热重载
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=settings.DEBUG )

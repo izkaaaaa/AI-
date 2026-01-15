@@ -1,7 +1,7 @@
 """
 实时检测API路由
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Depends, HTTPException, status
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import asyncio
@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 
 from app.db.database import get_db
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, decode_access_token
 from app.core.storage import upload_to_minio
 from app.services.websocket_manager import connection_manager
 from app.services.audio_processor import AudioProcessor
@@ -26,15 +26,36 @@ video_processor = VideoProcessor()
 
 
 @router.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: int):
+async def websocket_endpoint(
+    websocket: WebSocket, 
+    user_id: int,
+    token: str = Query(..., description="JWT认证Token")
+):
     """
     WebSocket连接端点 - 实时音视频流处理
     
-    连接后可以发送:
-    1. 音频流数据 (base64编码)
-    2. 视频帧数据 (base64编码)
-    3. 控制命令 (JSON格式)
+    连接方式: ws://localhost:8000/api/detection/ws/{user_id}?token={access_token}
+    
+    鉴权:
+    1. 校验URL参数中的Token有效性
+    2. 校验Token中的用户ID是否与路径参数user_id一致
     """
+    # 1. 鉴权逻辑
+    payload = decode_access_token(token)
+    
+    # Token无效或解析失败
+    if payload is None:
+        # 使用 1008 Policy Violation 关闭连接
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid Token")
+        return
+
+    # 验证 Token 中的用户ID是否匹配
+    token_user_id = payload.get("sub")
+    if token_user_id is None or int(token_user_id) != user_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User Identity Mismatch")
+        return
+
+    # 2. 鉴权通过，建立连接
     await connection_manager.connect(websocket, user_id)
     
     try:
@@ -49,7 +70,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
                 if message.get("type") == "audio":
                     # 处理音频数据
                     audio_data = message.get("data")
-                    result = await audio_processor.process_chunk(audio_data)
+                    result = await audio_processor.process_chunk(audio_data, user_id)
                     await websocket.send_json({
                         "type": "audio_result",
                         "result": result
@@ -58,7 +79,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
                 elif message.get("type") == "video":
                     # 处理视频帧
                     frame_data = message.get("data")
-                    result = await video_processor.process_frame(frame_data)
+                    result = await video_processor.process_frame(frame_data, user_id)
                     await websocket.send_json({
                         "type": "video_result",
                         "result": result
@@ -80,6 +101,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
                 
     except WebSocketDisconnect:
         connection_manager.disconnect(user_id)
+        # 移除该用户的缓冲区数据
+        audio_processor.clear_buffer(user_id)
+        video_processor.clear_buffer(user_id)
         print(f"User {user_id} disconnected")
 
 
