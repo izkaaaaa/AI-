@@ -1,7 +1,7 @@
 """
 Pydantic Schema 模型
 """
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -33,8 +33,8 @@ class UserResponse(UserBase):
     is_active: bool
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    # 修改为 V2 写法
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TokenResponse(BaseModel):
@@ -66,8 +66,8 @@ class CallRecordResponse(CallRecordBase):
     audio_url: Optional[str] = None
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    # 修改为 V2 写法
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== AI检测日志相关 ==========
@@ -84,6 +84,7 @@ class AIDetectionLogCreate(AIDetectionLogBase):
     call_id: int
     detected_keywords: Optional[str] = None
     model_version: Optional[str] = None
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class AIDetectionLogResponse(AIDetectionLogBase):
@@ -94,8 +95,11 @@ class AIDetectionLogResponse(AIDetectionLogBase):
     model_version: Optional[str] = None
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    # 核心修复：合并配置，删除 class Config
+    model_config = ConfigDict(
+        from_attributes=True,
+        protected_namespaces=()
+    )
 
 
 # ========== 通用响应 ==========
