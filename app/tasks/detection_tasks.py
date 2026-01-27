@@ -189,35 +189,39 @@ def detect_text_task(self, text: str, user_id: int, call_id: int) -> Dict:
     try:
         self.update_state(state='PROCESSING', meta={'progress': 0})
         
-        # [修正 1] predict_text 是同步函数，直接调用，不要用 loop.run_until_complete
-        # 这一步是 CPU 密集型的，会阻塞 worker 一小会儿，但在 Celery 里是可以接受的
+        # 1. 纯 CPU 计算 (同步执行即可)
         result = model_service.predict_text(text)
         
         self.update_state(state='PROCESSING', meta={'progress': 80})
         
-        # [修正 2] 检查返回结果的键值
-        # model_service.predict_text 返回的是 {"label": "fraud", ...}
+        # 2. 根据结果发布 Redis 消息
         if result.get('label') == 'fraud':
             logger.warning(f"⚠️ DETECTED SCAM TEXT! Conf: {result.get('confidence')}")
             
-            # [修正 3] 发送消息是异步的，需要这就需要 Event Loop 了
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(
-                    connection_manager.send_personal_message({
-                        "type": "alert",
-                        "msg_type": "text",
-                        "message": "检测到诈骗话术!",
-                        "confidence": result['confidence'],
-                        "keywords": result.get('keywords', []),
-                        "call_id": call_id
-                    }, user_id)
-                )
-            finally:
-                loop.close()
+            # [修正] 使用 publish_to_redis 通知主进程发送 WebSocket
+            payload = {
+                "type": "alert",
+                "msg_type": "text",
+                "message": "检测到诈骗话术!",
+                "confidence": result['confidence'],
+                "keywords": result.get('keywords', []),
+                "call_id": call_id
+            }
+            # 直接调用本文件定义的辅助函数
+            publish_to_redis(user_id, payload)
+            
         else:
             logger.info(f"Text detection passed (Normal). Conf: {result.get('confidence')}")
+            
+            payload = {
+                "type": "info",      # 标记为 info 消息，前端可以不弹窗只显示绿标
+                "msg_type": "text",
+                "message": "语义安全", # 或者 "正常对话"
+                "confidence": result.get('confidence'),
+                "call_id": call_id
+            }
+
+            publish_to_redis(user_id, payload)
 
         return {
             "status": "success",
@@ -232,6 +236,7 @@ def detect_text_task(self, text: str, user_id: int, call_id: int) -> Dict:
             "message": str(e),
             "call_id": call_id
         }
+
 
 # 状态查询任务保持不变...
 @celery_app.task(name="get_task_status")
