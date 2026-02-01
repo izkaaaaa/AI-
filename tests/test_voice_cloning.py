@@ -13,7 +13,7 @@ import random
 from pathlib import Path
 
 # === 配置区域 ===
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://127.0.0.1:8000"
 # 自动定位到 tests/assets 目录
 CURRENT_DIR = Path(__file__).parent
 ASSETS_DIR = CURRENT_DIR / "assets"
@@ -111,7 +111,7 @@ async def main():
     print(f"📂 资源目录: {ASSETS_DIR}")
     
     # 1. 登录获取 Token
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             # 确保这里使用你数据库中存在的账号
             resp = await client.post(f"{BASE_URL}/api/users/login", 

@@ -5,6 +5,7 @@ from fastapi import WebSocket
 from typing import Dict, List
 import asyncio
 from datetime import datetime
+from app.core.redis import set_user_preference
 # [新增] 导入日志工厂
 from app.core.logger import get_logger
 
@@ -20,18 +21,25 @@ class ConnectionManager:
         self.active_connections: Dict[int, WebSocket] = {}
         # 连接时间记录
         self.connection_times: Dict[int, datetime] = {}
+        # 记录每个用户的当前防御等级 (默认 0)
+        self.user_levels: Dict[int, int] = {}
     
     async def connect(self, websocket: WebSocket, user_id: int):
         """接受新连接"""
         await websocket.accept()
         self.active_connections[user_id] = websocket
         self.connection_times[user_id] = datetime.now()
-        
-        # [修改] print -> logger.info (记录当前在线人数，这是非常关键的运维指标)
+        # 初始防御等级为 Level 0 (安全/待机)
+        self.user_levels[user_id] = 0
+
+        # 记录当前在线人数，这是非常关键的运维指标
         logger.info(f"User {user_id} connected. Total connections: {len(self.active_connections)}")
-    
+
+   
     def disconnect(self, user_id: int):
         """断开连接"""
+        if user_id in self.user_levels:
+            del self.user_levels[user_id]
         if user_id in self.active_connections:
             del self.active_connections[user_id]
         if user_id in self.connection_times:
@@ -39,7 +47,30 @@ class ConnectionManager:
             
         # [修改] print -> logger.info
         logger.info(f"User {user_id} disconnected. Total connections: {len(self.active_connections)}")
-    
+
+    # 设置防御等级并同步给前端   
+    async def set_defense_level(self, user_id: int, level: int, config: dict = None):
+        """
+        供后端逻辑调用：变更防御等级 -> 下发控制指令 -> 改变前端采集策略
+        """
+        # 1. 更新服务端状态
+        self.user_levels[user_id] = level
+        
+        # 2. 如果用户在线，下发指令
+        if user_id in self.active_connections:
+            # 构造同步消息
+            message = {
+                "type": "level_sync",
+                "level": level,  # 0, 1, 2
+                "config": config or {}, # 包含 fps, sensitive 等配置
+                "timestamp": datetime.now().isoformat()
+            }
+            try:
+                await self.send_personal_message(message, user_id)
+                logger.info(f"🛡️ Defense Level Upgraded: User {user_id} -> Level {level}")
+            except Exception as e:
+                logger.error(f"Failed to sync level to user {user_id}: {e}")
+
     async def send_personal_message(self, message: dict, user_id: int):
         """发送个人消息"""
         if user_id in self.active_connections:
@@ -47,9 +78,7 @@ class ConnectionManager:
             try:
                 await websocket.send_json(message)
             except Exception as e:
-                # [新增] 发送失败通常意味着连接已断开但还没来得及清理
                 logger.error(f"Failed to send personal message to {user_id}: {e}", exc_info=True)
-                # 可以在这里触发 disconnect，但为了逻辑安全通常交给 heartbeat_check 处理
     
     async def broadcast(self, message: dict, exclude_user: int = None):
         """广播消息给所有连接(可排除某个用户)"""

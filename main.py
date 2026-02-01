@@ -47,7 +47,12 @@ async def redis_listener():
                     # 2. 转发给 WebSocket
                     # 因为这个函数运行在 Main 进程，它能访问到真正的 active_connections
                     if user_id and connection_manager.is_user_online(user_id):
-                        await connection_manager.send_personal_message(payload, user_id)
+                        if payload.get("type") == "control" and payload.get("action") == "upgrade_level":
+                            target_level = payload.get("target_level")
+                            config = payload.get("config")
+                            await connection_manager.set_defense_level(user_id, target_level, config)
+                        else:
+                            await connection_manager.send_personal_message(payload, user_id)
                         logger.info(f"📡 [转发成功] Celery -> User {user_id} | Type: {payload.get('type')}")
                     else:
                         # 用户可能已经断开了，这是正常现象

@@ -3,13 +3,15 @@ MinIO对象存储工具
 """
 from minio import Minio
 from minio.error import S3Error
+# [新增] 导入生命周期配置相关的类
+from minio.lifecycleconfig import LifecycleConfig, Rule, Expiration
+from minio.commonconfig import Filter
 from typing import Optional
 import io
 from app.core.config import settings
-# [新增] 导入日志
 from app.core.logger import get_logger
 
-# [新增] 初始化模块级 logger
+# 初始化模块级 logger
 logger = get_logger(__name__)
 
 
@@ -26,9 +28,11 @@ class MinIOClient:
             )
             self.bucket_name = settings.MINIO_BUCKET_NAME
             self._ensure_bucket()
+            # [新增] 初始化时配置生命周期
+            self._configure_lifecycle()
             logger.info(f"MinIO client initialized (Endpoint: {settings.MINIO_ENDPOINT})")
         except Exception as e:
-            # [新增] 初始化失败通常是配置错误或服务未启动，属于严重错误
+            # 初始化失败通常是配置错误或服务未启动，属于严重错误
             logger.critical(f"Failed to initialize MinIO client: {e}", exc_info=True)
             # 这里可以选择是否抛出异常阻断启动，或者允许应用在无存储功能下运行
     
@@ -37,13 +41,33 @@ class MinIOClient:
         try:
             if not self.client.bucket_exists(self.bucket_name):
                 self.client.make_bucket(self.bucket_name)
-                # [新增] 记录重要的变更操作
+                # 记录重要的变更操作
                 logger.info(f"Created new MinIO bucket: {self.bucket_name}")
         except S3Error as e:
-            # [修改] print -> logger.error
             logger.error(f"Error checking/creating bucket '{self.bucket_name}': {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Unexpected error in MinIO connection: {e}", exc_info=True)
+
+    def _configure_lifecycle(self):
+        """
+        [新增] 配置存储桶生命周期
+        策略: 'dataset/' 目录下的文件(原始训练数据) 1天后自动过期删除
+        """
+        try:
+            # 定义规则: 匹配 dataset/ 前缀，1天后过期
+            rule = Rule(
+                rule_id="expire_temp_dataset_24h",
+                status="Enabled",
+                rule_filter=Filter(prefix="dataset/"),
+                expiration=Expiration(days=1)
+            )
+            
+            config = LifecycleConfig([rule])
+            self.client.set_bucket_lifecycle(self.bucket_name, config)
+            logger.info("MinIO lifecycle policy configured: expire 'dataset/' after 1 day")
+        except Exception as e:
+            # 生命周期配置失败不应阻断服务启动，记录错误即可
+            logger.error(f"Failed to set lifecycle policy: {e}")
     
     def upload_file(self, file_data: bytes, object_name: str, content_type: str = "application/octet-stream") -> Optional[str]:
         """上传文件"""
@@ -60,7 +84,6 @@ class MinIOClient:
             return f"{self.bucket_name}/{object_name}"
             
         except S3Error as e:
-            # [修改] print -> logger.error
             logger.error(f"Error uploading file '{object_name}': {e}", exc_info=True)
             return None
         except Exception as e:
@@ -73,7 +96,6 @@ class MinIOClient:
             url = self.client.presigned_get_object(self.bucket_name, object_name)
             return url
         except S3Error as e:
-            # [修改] print -> logger.error
             logger.error(f"Error getting URL for '{object_name}': {e}", exc_info=True)
             return None
     
@@ -84,7 +106,6 @@ class MinIOClient:
             logger.info(f"File deleted: {object_name}")
             return True
         except S3Error as e:
-            # [修改] print -> logger.error
             logger.error(f"Error deleting file '{object_name}': {e}", exc_info=True)
             return False
 
