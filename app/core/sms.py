@@ -7,6 +7,9 @@ from typing import Optional
 from app.core.config import settings
 from app.core.logger import get_logger
 
+# 创建 logger 实例
+logger = get_logger(__name__)
+
 # 创建Redis客户端(用于存储验证码)
 redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)  # type: ignore[assignment]
 
